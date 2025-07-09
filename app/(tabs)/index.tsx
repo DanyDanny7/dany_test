@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { NewsItem } from '@/components/NewsItem';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
@@ -16,6 +16,7 @@ export default function HomeScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const perPage = 2;
 
   const loadNews = async (pageNumber: number = 1, isRefresh: boolean = false) => {
     if ((loading || loadingMore) && !isRefresh) return;
@@ -27,16 +28,17 @@ export default function HomeScreen() {
     }
     
     try {
-      const response = await getTopHeadlines(pageNumber, 20);
+      const response = await getTopHeadlines(pageNumber, perPage);
       
       if (isRefresh) {
         setArticles(response.articles);
         setPage(2);
-        setHasMore(response.articles.length === 20);
+        setHasMore(response.articles.length === perPage);
       } else {
         setArticles(prev => [...prev, ...response.articles]);
         setPage(pageNumber + 1);
-        setHasMore(response.articles.length === 20);
+        const hasMoreContent = response.articles.length === perPage;
+        setHasMore(hasMoreContent);
       }
     } catch (error) {
       Alert.alert('Error', 'No se pudieron cargar las noticias');
@@ -75,12 +77,31 @@ export default function HomeScreen() {
     <NewsItem article={item} onPress={handleNewsPress} />
   );
 
-  const renderFooter = () => {
-    if (!loadingMore || !hasMore) return null;
+  const renderLoadMoreButton = () => {
+    if (!hasMore) {
+      return (
+        <ThemedView style={styles.loadMoreContainer}>
+          <ThemedText style={styles.noMoreText}>✓ Has visto todas las noticias</ThemedText>
+        </ThemedView>
+      );
+    }
+
     return (
-      <ThemedView style={styles.loadingFooter}>
-        <ActivityIndicator size="large" />
-        <ThemedText style={styles.loadingText}>Cargando más noticias...</ThemedText>
+      <ThemedView style={styles.loadMoreContainer}>
+        <TouchableOpacity 
+          style={[styles.loadMoreButton, loadingMore && styles.loadMoreButtonDisabled]} 
+          onPress={handleLoadMore}
+          disabled={loadingMore}
+        >
+          {loadingMore ? (
+            <>
+              <ActivityIndicator size="small" color="#fff" style={styles.buttonSpinner} />
+              <ThemedText style={styles.loadMoreButtonText}>Cargando...</ThemedText>
+            </>
+          ) : (
+            <ThemedText style={styles.loadMoreButtonText}>Cargar más noticias</ThemedText>
+          )}
+        </TouchableOpacity>
       </ThemedView>
     );
   };
@@ -120,24 +141,19 @@ export default function HomeScreen() {
           data={articles}
           renderItem={renderNewsItem}
           keyExtractor={(item, index) => `${item.url}-${index}`}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.3}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
             />
           }
-          ListFooterComponent={renderFooter}
           ListEmptyComponent={renderEmptyComponent}
           showsVerticalScrollIndicator={false}
           style={styles.newsList}
           contentContainerStyle={styles.newsListContent}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          initialNumToRender={10}
-          windowSize={10}
         />
+        
+        {articles.length > 0 && renderLoadMoreButton()}
       </ParallaxScrollView>
     </ThemedView>
   );
@@ -189,5 +205,44 @@ const styles = StyleSheet.create({
     marginTop: 10,
     opacity: 0.7,
     textAlign: 'center',
+  },
+  loadMoreContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  loadMoreButtonDisabled: {
+    backgroundColor: '#999',
+  },
+  loadMoreButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonSpinner: {
+    marginRight: 8,
+  },
+  noMoreText: {
+    opacity: 0.6,
+    fontStyle: 'italic',
+    color: '#666',
+    fontSize: 14,
   },
 });
